@@ -1,5 +1,3 @@
-
-
 ## Cài đặt
 
 Cần **Python 3.12**. PaddlePaddle chưa có bản cho Python 3.13.
@@ -35,3 +33,66 @@ uv run python -c "import sys; print(sys.executable)"
 git add .
 git status
 git commit -m "chore: initialize project environment"
+
+git status
+git add .
+git commit -m "feat: implement helmet detection"
+git push
+
+**Lưu ý:** Không commit dữ liệu thực tế chứa biển số, khuôn mặt hoặc video cá nhân lên repository, kể cả khi repository đang Private.
+
+| Prefix        | Mục đích                       |
+| ------------- | --------------------------------- |
+| `feat:`     | Thêm tính năng                 |
+| `fix:`      | Sửa lỗi                         |
+| `refactor:` | Tái cấu trúc code              |
+| `test:`     | Thêm hoặc sửa test             |
+| `docs:`     | Cập nhật tài liệu             |
+| `chore:`    | Cấu hình, dependencies, tooling |
+
+# Vietnam Traffic Violation Detection System (VTVDS)
+
+A computer vision system for detecting selected traffic violations
+from uploaded images and videos.
+
+## MVP Scope
+
+- Motorcycle rider without helmet detection.
+- Red-light violation detection.
+- Vietnamese license plate detection and OCR.
+- Compare detected plate with user-provided plate.
+- Annotated image/video output.
+- Human-review status for uncertain results.
+
+## Tech Stack
+
+- Python 3.12
+- uv
+- OpenCV
+- PyTorch (subject to model selection)
+- FastAPI
+- Gradio
+- SQLite
+- Git and GitHub
+
+## Development Setup
+
+### 1. Install dependencies
+
+Install uv, then run:
+
+```powershell
+uv sync
+```
+
+### 2. Activate environment (PowerShell)
+
+.\.venv\Scripts\Activate.ps1
+
+### 3. Run tests
+
+uv run pytest
+
+### 4. Run lint
+
+uv run ruff check .
