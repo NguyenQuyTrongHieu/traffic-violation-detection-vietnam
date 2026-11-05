@@ -29,3 +29,7 @@ temp/
 # OS
 .DS_Store
 Thumbs.db
+# Local test data and generated outputs
+/runs/
+/scripts/full_LS.png
+/scripts/Screenshot *.png

@@ -1,3 +1,4 @@
+
 ## Cài đặt
 
 Cần **Python 3.12**. PaddlePaddle chưa có bản cho Python 3.13.
@@ -96,3 +97,9 @@ uv run pytest
 ### 4. Run lint
 
 uv run ruff check .
+
+uv run ruff check . --fix
+uv run ruff format .
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
