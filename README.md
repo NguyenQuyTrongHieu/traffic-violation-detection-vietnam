@@ -1,4 +1,3 @@
-
 ## Cài đặt
 
 Cần **Python 3.12**. PaddlePaddle chưa có bản cho Python 3.13.
@@ -38,7 +37,7 @@ git commit -m "chore: initialize project environment"
 git status
 git add .
 git commit -m "feat: implement helmet detection"
-git push
+git push origin main
 
 **Lưu ý:** Không commit dữ liệu thực tế chứa biển số, khuôn mặt hoặc video cá nhân lên repository, kể cả khi repository đang Private.
 
