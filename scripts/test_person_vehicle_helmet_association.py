@@ -45,9 +45,7 @@ def get_center(bbox):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Smoke test person-motorcycle-helmet association."
-    )
+    parser = argparse.ArgumentParser(description="Smoke test person-motorcycle-helmet association.")
     parser.add_argument("image_path", type=Path)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -70,16 +68,10 @@ def main():
     person_vehicle_detector = PersonVehicleDetector()
     object_detections, pv_time = person_vehicle_detector.predict(image)
 
-    persons = [
-        detection
-        for detection in object_detections
-        if detection.class_name == "person"
-    ]
+    persons = [detection for detection in object_detections if detection.class_name == "person"]
 
     motorcycles = [
-        detection
-        for detection in object_detections
-        if detection.class_name == "motorcycle"
+        detection for detection in object_detections if detection.class_name == "motorcycle"
     ]
 
     # 2. Run helmet detector.
@@ -134,9 +126,7 @@ def main():
         person_center = get_center(person.bbox_xyxy)
 
         if association.motorcycle is not None:
-            motorcycle_center = get_center(
-                association.motorcycle.bbox_xyxy
-            )
+            motorcycle_center = get_center(association.motorcycle.bbox_xyxy)
             cv2.line(
                 annotated_image,
                 person_center,
@@ -163,9 +153,7 @@ def main():
                 "helmet_status": association.helmet_status.value,
                 "helmet_score": association.helmet_score,
                 "helmet_class": (
-                    association.helmet.class_name
-                    if association.helmet is not None
-                    else None
+                    association.helmet.class_name if association.helmet is not None else None
                 ),
             }
         )
@@ -185,23 +173,19 @@ def main():
 
     # 7. Print summary.
     vehicle_associated = sum(
-        item.motorcycle_status == AssociationStatus.ASSOCIATED
-        for item in result.associations
+        item.motorcycle_status == AssociationStatus.ASSOCIATED for item in result.associations
     )
 
     vehicle_ambiguous = sum(
-        item.motorcycle_status == AssociationStatus.AMBIGUOUS
-        for item in result.associations
+        item.motorcycle_status == AssociationStatus.AMBIGUOUS for item in result.associations
     )
 
     helmet_associated = sum(
-        item.helmet_status == AssociationStatus.ASSOCIATED
-        for item in result.associations
+        item.helmet_status == AssociationStatus.ASSOCIATED for item in result.associations
     )
 
     helmet_ambiguous = sum(
-        item.helmet_status == AssociationStatus.AMBIGUOUS
-        for item in result.associations
+        item.helmet_status == AssociationStatus.AMBIGUOUS for item in result.associations
     )
 
     print("\n========== SUMMARY ==========")
