@@ -1,9 +1,9 @@
 VTVDS — Implementation Registry
 Project: Vietnam Traffic Violation Detection System
 Document: Implementation Registry
-Version: 0.3
-Current series: T0-009 — Violation Logicz
-Latest completed ticket: T0-008.4 — Detection + Association Review/Bonus
+Version: 0.4
+Current series: T0-010 — Video Pipeline
+Latest completed ticket: T0-009.3 — Violation Logic Review/Bonus
 Purpose: Canonical reference for implemented modules, classes, functions, imports, and interfaces.
 
 1. Source-of-truth rules
@@ -406,7 +406,84 @@ Responsibilities and current heuristic:
    |
    v
    PlateRecognition / Result
-   The detection and association components are not yet connected to a final violation decision module. T0-009 will define that decision layer and its evidence/status contracts.
+   Detection and association outputs feed the T0-009 violation decision layer. The current decision modules consume structured evidence; video ingestion, traffic-light recognition, tracking, and stop-line crossing extraction are not yet implemented.
+
+6.1 Violation decision logic
+   Package path:
+
+src/traffic_violation_detection_vietnam/violations/
+
+6.1.1 helmet_violation_decider.py
+Enums:
+- HelmetViolationStatus: VIOLATION_CANDIDATE, NO_VIOLATION_DETECTED, NEEDS_REVIEW, NOT_APPLICABLE.
+- HelmetViolationReason: RIDER_WITHOUT_HELMET, RIDER_WITH_HELMET, MOTORCYCLE_NOT_ASSOCIATED, MOTORCYCLE_ASSOCIATION_AMBIGUOUS, MOTORCYCLE_DATA_MISSING, HELMET_NOT_DETECTED, HELMET_ASSOCIATION_AMBIGUOUS, HELMET_DATA_INCONSISTENT, HELMET_CONFIDENCE_INVALID, HELMET_CONFIDENCE_TOO_LOW, UNKNOWN_HELMET_CLASS, MOTORCYCLE_DATA_INCONSISTENT, HELMET_CLASS_INCONSISTENT.
+
+Dataclass: HelmetViolationDecision
+Fields:
+- person: ObjectDetection
+- motorcycle: ObjectDetection | None
+- helmet: HelmetDetection | None
+- status: HelmetViolationStatus
+- reason_code: HelmetViolationReason
+- helmet_confidence: float | None
+
+Class: HelmetViolationDecider
+Constructor:
+HelmetViolationDecider(min_helmet_confidence: float = 0.5)
+Method:
+decide(association_result: PersonVehicleHelmetAssociationResult) -> list[HelmetViolationDecision]
+
+Decision behavior:
+- Evaluate each person association independently.
+- A person without an associated motorcycle is NOT_APPLICABLE.
+- Inconsistent motorcycle status/object combinations require NEEDS_REVIEW.
+- Ambiguous motorcycle or helmet association requires NEEDS_REVIEW.
+- A missing helmet detection is not interpreted as a no-helmet violation; it requires NEEDS_REVIEW.
+- Validate helmet class ID/name consistency: class 0 = with_helmet; class 1 = without_helmet.
+- Unknown or inconsistent class metadata requires NEEDS_REVIEW.
+- Invalid or low helmet confidence requires NEEDS_REVIEW.
+- A valid without_helmet classification returns VIOLATION_CANDIDATE.
+- A valid with_helmet classification returns NO_VIOLATION_DETECTED.
+- The default 0.5 confidence threshold is provisional and not calibrated.
+
+6.1.2 red_light_violation_decider.py
+Enums:
+- TrafficLightState: RED, YELLOW, GREEN, UNKNOWN.
+- CrossingStatus: CROSSED, NOT_CROSSED, AMBIGUOUS, NOT_EVALUABLE.
+- RedLightViolationStatus: VIOLATION_CANDIDATE, NO_VIOLATION_DETECTED, NEEDS_REVIEW, NOT_APPLICABLE.
+- RedLightViolationReason: MOTORCYCLE_CROSSED_ON_RED, MOTORCYCLE_CROSSED_ON_GREEN, MOTORCYCLE_DID_NOT_CROSS, NON_MOTORCYCLE, CROSSING_AMBIGUOUS, CROSSING_NOT_EVALUABLE, INVALID_CROSSING_EVIDENCE, TRACK_ID_MISSING, TRAFFIC_LIGHT_OBSERVATION_MISSING, TRAFFIC_LIGHT_TIME_GAP_TOO_LARGE, TRAFFIC_LIGHT_STATE_TRANSITION, TRAFFIC_LIGHT_STATE_UNKNOWN, TRAFFIC_LIGHT_YELLOW, TRAFFIC_LIGHT_CONFIDENCE_TOO_LOW, CROSSING_CONFIDENCE_TOO_LOW, INVALID_TRAFFIC_LIGHT_OBSERVATION.
+
+Dataclasses:
+- StopLineCrossingEvent(track_id: str, vehicle_class: str, timestamp_ms: float, status: CrossingStatus, confidence: float)
+- TrafficLightObservation(timestamp_ms: float, state: TrafficLightState, confidence: float)
+- RedLightEvidence(crossing_event: StopLineCrossingEvent, traffic_light_observations: list[TrafficLightObservation])
+- RedLightViolationDecision(track_id, status, reason_code, crossing_timestamp_ms, traffic_light_state, traffic_light_confidence)
+
+Class: RedLightViolationDecider
+Constructor:
+RedLightViolationDecider(min_crossing_confidence: float = 0.5, min_traffic_light_confidence: float = 0.5, max_signal_gap_ms: float = 500.0)
+Method:
+decide(evidence: RedLightEvidence) -> RedLightViolationDecision
+
+Decision behavior:
+- Only motorcycle events are applicable.
+- NOT_CROSSED returns NO_VIOLATION_DETECTED.
+- AMBIGUOUS or NOT_EVALUABLE crossing returns NEEDS_REVIEW.
+- A crossed event requires a valid track ID, timestamp, and confidence.
+- Traffic-light observations must be valid and temporally support the crossing timestamp.
+- An exact-timestamp observation can be used directly; otherwise, before/after observations must be within max_signal_gap_ms and agree on state.
+- RED returns VIOLATION_CANDIDATE; GREEN returns NO_VIOLATION_DETECTED.
+- YELLOW, UNKNOWN, state transitions, missing/invalid observations, low confidence, or excessive time gaps return NEEDS_REVIEW.
+- Default thresholds and the 500 ms maximum signal gap are provisional, not calibrated.
+
+6.1.3 violations/__init__.py
+Exports the public enums, dataclasses, and decider classes listed above.
+
+Decision boundary:
+- These modules interpret structured detections/associations/evidence; they do not perform image/video detection, tracking, traffic-light recognition, or stop-line geometry.
+- VIOLATION_CANDIDATE is not a legally authoritative enforcement decision.
+- Uncertain or inconsistent evidence must remain NEEDS_REVIEW.
+
 7. Development scripts
    Script	Responsibility
    scripts/test_plate_detector.py	License plate detector smoke test
@@ -423,12 +500,12 @@ Responsibilities and current heuristic:
 
 Scripts are development tools, not production modules. Meaningful assertions should progressively move into automated tests.
 8. Current reported test baseline
-Latest reported project-root checks after T0-008.3:
+Latest user-reported project-root checks after T0-009.3 (2026-11-17):
 
 - uv run ruff check .: passed.
-- uv run ruff format --check .: passed; 33 files already formatted.
-- uv run pytest -q: 28 passed.
-  The 28-test count includes the earlier project, plate/OCR and detector/association unit tests at the time of the reported run. Re-run the commands after pulling the latest changes or editing this registry; this document update itself does not claim a fresh test execution.
+- uv run ruff format --check .: passed.
+- uv run pytest -q: 65 passed.
+  These are user-reported local results; this registry update does not claim an independent test execution.
   8.1 Person/motorcycle/helmet association smoke test
   Script:
 
@@ -503,7 +580,7 @@ User-reported run summary:
 
 - No comprehensive OCR accuracy evaluation has been completed.
 - No representative full-scene detection benchmark has been completed.
-- No video-based violation detection has been implemented yet.
+- No video-based violation detection has been implemented yet; T0-009 decision modules currently consume structured evidence rather than extracting it from frames.
 - No automated unit tests currently cover every detector, cropper, OCR, and recognition-pipeline behavior.
 - The current matching logic is exact string matching after normalization; it does not correct OCR character confusions.
 - Multiple detected plates are aggregated as a match if any one plate matches the expected plate. This behavior may need reconsideration when vehicle-to-plate association is implemented.
@@ -513,4 +590,4 @@ User-reported run summary:
 - No representative end-to-end evaluation has been performed on full-scene traffic images/videos.
 - Do not equate NOT_DETECTED with WITHOUT_HELMET; an absent detection may result from occlusion, scale, angle, image quality, or model failure.
 - Do not use the current helmet model as the sole basis for an authoritative violation decision.
-  Registry status: Updated to reflect T0-008.1–T0-008.4 based on the implementation and user-reported test/smoke-test results available on 2026-11-09. T0-008 is closed as a baseline implementation series; model-quality limitations remain explicit backlog items. Current planned series: T0-009 — Violation Logic.
+  Registry status: Updated to reflect T0-008.1–T0-008.4 and T0-009.1–T0-009.3 based on GitHub main source review and user-reported local test results available on 2026-11-17. T0-009 is closed; decision logic is implemented, while upstream video evidence extraction and model-quality limitations remain explicit backlog items. Current planned series: T0-010 — Video Pipeline.
