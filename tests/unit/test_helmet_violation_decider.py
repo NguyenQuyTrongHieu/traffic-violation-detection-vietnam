@@ -114,3 +114,24 @@ def test_unknown_helmet_class_requires_review():
 def test_invalid_confidence_threshold_raises_error(threshold):
     with pytest.raises(ValueError):
         HelmetViolationDecider(min_helmet_confidence=threshold)
+
+
+def test_motorcycle_object_with_not_associated_status_requires_review():
+    association = make_association()
+    association.motorcycle_status = AssociationStatus.NOT_ASSOCIATED
+
+    decision = decide(association)
+
+    assert decision.status == HelmetViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == HelmetViolationReason.MOTORCYCLE_DATA_INCONSISTENT
+
+
+def test_helmet_class_id_name_mismatch_requires_review():
+    association = make_association()
+    association.helmet.class_id = 1
+    association.helmet.class_name = "with_helmet"
+
+    decision = decide(association)
+
+    assert decision.status == HelmetViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == HelmetViolationReason.HELMET_CLASS_INCONSISTENT

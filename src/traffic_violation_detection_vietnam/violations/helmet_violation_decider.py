@@ -30,6 +30,8 @@ class HelmetViolationReason(StrEnum):
     HELMET_CONFIDENCE_INVALID = "helmet_confidence_invalid"
     HELMET_CONFIDENCE_TOO_LOW = "helmet_confidence_too_low"
     UNKNOWN_HELMET_CLASS = "unknown_helmet_class"
+    MOTORCYCLE_DATA_INCONSISTENT = "motorcycle_data_inconsistent"
+    HELMET_CLASS_INCONSISTENT = "helmet_class_inconsistent"
 
 
 @dataclass
@@ -74,6 +76,13 @@ class HelmetViolationDecider:
             AssociationStatus.NOT_ASSOCIATED,
             AssociationStatus.NOT_DETECTED,
         }:
+            if association.motorcycle is not None:
+                return self._decision(
+                    association,
+                    HelmetViolationStatus.NEEDS_REVIEW,
+                    HelmetViolationReason.MOTORCYCLE_DATA_INCONSISTENT,
+                )
+
             return self._decision(
                 association,
                 HelmetViolationStatus.NOT_APPLICABLE,
@@ -121,8 +130,39 @@ class HelmetViolationDecider:
                 HelmetViolationStatus.NEEDS_REVIEW,
                 HelmetViolationReason.HELMET_DATA_INCONSISTENT,
             )
+        expected_classes = {
+            0: "with_helmet",
+            1: "without_helmet",
+        }
 
-        if not isfinite(helmet.confidence) or not 0.0 <= helmet.confidence <= 1.0:
+        if helmet.class_name not in expected_classes.values():
+            return self._decision(
+                association,
+                HelmetViolationStatus.NEEDS_REVIEW,
+                HelmetViolationReason.UNKNOWN_HELMET_CLASS,
+            )
+
+        expected_class_name = expected_classes.get(helmet.class_id)
+
+        if expected_class_name is None:
+            return self._decision(
+                association,
+                HelmetViolationStatus.NEEDS_REVIEW,
+                HelmetViolationReason.UNKNOWN_HELMET_CLASS,
+            )
+
+        if helmet.class_name != expected_class_name:
+            return self._decision(
+                association,
+                HelmetViolationStatus.NEEDS_REVIEW,
+                HelmetViolationReason.HELMET_CLASS_INCONSISTENT,
+            )
+        if (
+            not isinstance(helmet.confidence, (int, float))
+            or isinstance(helmet.confidence, bool)
+            or not isfinite(helmet.confidence)
+            or not 0.0 <= helmet.confidence <= 1.0
+        ):
             return self._decision(
                 association,
                 HelmetViolationStatus.NEEDS_REVIEW,

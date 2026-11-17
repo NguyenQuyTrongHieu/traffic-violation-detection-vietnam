@@ -213,3 +213,44 @@ def test_invalid_configuration_raises_error(
             min_traffic_light_confidence=light_threshold,
             max_signal_gap_ms=max_gap,
         )
+
+
+def test_missing_track_id_requires_review():
+    evidence = make_evidence()
+    evidence.crossing_event.track_id = ""
+
+    decision = RedLightViolationDecider().decide(evidence)
+
+    assert decision.status == RedLightViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == RedLightViolationReason.TRACK_ID_MISSING
+
+
+def test_invalid_track_id_type_requires_review():
+    evidence = make_evidence()
+    evidence.crossing_event.track_id = None
+
+    decision = RedLightViolationDecider().decide(evidence)
+
+    assert decision.status == RedLightViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == RedLightViolationReason.INVALID_CROSSING_EVIDENCE
+
+
+@pytest.mark.parametrize("timestamp", [-1.0, float("nan"), float("inf")])
+def test_invalid_light_observation_timestamp_requires_review(timestamp):
+    evidence = make_evidence()
+    evidence.traffic_light_observations[0].timestamp_ms = timestamp
+
+    decision = RedLightViolationDecider().decide(evidence)
+
+    assert decision.status == RedLightViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == RedLightViolationReason.INVALID_TRAFFIC_LIGHT_OBSERVATION
+
+
+def test_invalid_light_observation_confidence_requires_review():
+    evidence = make_evidence()
+    evidence.traffic_light_observations[0].confidence = 1.5
+
+    decision = RedLightViolationDecider().decide(evidence)
+
+    assert decision.status == RedLightViolationStatus.NEEDS_REVIEW
+    assert decision.reason_code == RedLightViolationReason.INVALID_TRAFFIC_LIGHT_OBSERVATION

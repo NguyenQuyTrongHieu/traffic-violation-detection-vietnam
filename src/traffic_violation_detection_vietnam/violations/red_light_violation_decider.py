@@ -40,6 +40,7 @@ class RedLightViolationReason(StrEnum):
     TRAFFIC_LIGHT_YELLOW = "traffic_light_yellow"
     TRAFFIC_LIGHT_CONFIDENCE_TOO_LOW = "traffic_light_confidence_too_low"
     CROSSING_CONFIDENCE_TOO_LOW = "crossing_confidence_too_low"
+    INVALID_TRAFFIC_LIGHT_OBSERVATION = "invalid_traffic_light_observation"
 
 
 @dataclass
@@ -98,8 +99,13 @@ class RedLightViolationDecider:
         self.max_signal_gap_ms = max_signal_gap_ms
 
     @staticmethod
-    def _valid_confidence(value: float) -> bool:
-        return isfinite(value) and 0.0 <= value <= 1.0
+    def _valid_confidence(value: object) -> bool:
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and isfinite(value)
+            and 0.0 <= value <= 1.0
+        )
 
     def _decision(
         self,
@@ -139,7 +145,19 @@ class RedLightViolationDecider:
         observations: list[TrafficLightObservation],
     ) -> tuple[TrafficLightState | None, float | None, RedLightViolationReason | None]:
         timestamp = event.timestamp_ms
+        if not isinstance(observations, list) or not observations:
+            return (
+                None,
+                None,
+                RedLightViolationReason.TRAFFIC_LIGHT_OBSERVATION_MISSING,
+            )
 
+        if not all(self._valid_observation(item) for item in observations):
+            return (
+                None,
+                None,
+                RedLightViolationReason.INVALID_TRAFFIC_LIGHT_OBSERVATION,
+            )
         exact = [item for item in observations if item.timestamp_ms == timestamp]
 
         if exact:
@@ -213,7 +231,28 @@ class RedLightViolationDecider:
         evidence: RedLightEvidence,
     ) -> RedLightViolationDecision:
         event = evidence.crossing_event
+        if not isinstance(event, StopLineCrossingEvent):
+            raise TypeError("crossing_event must be a StopLineCrossingEvent")
 
+        if not isinstance(event.vehicle_class, str):
+            return self._review(
+                event,
+                RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
+            )
+
+        if not isinstance(event.status, CrossingStatus):
+            return self._review(
+                event,
+                RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
+            )
+
+        if not self._valid_timestamp(event.timestamp_ms) or not self._valid_confidence(
+            event.confidence
+        ):
+            return self._review(
+                event,
+                RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
+            )
         if event.vehicle_class != "motorcycle":
             return self._decision(
                 event,
@@ -246,20 +285,16 @@ class RedLightViolationDecider:
                 RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
             )
 
+        if not isinstance(event.track_id, str):
+            return self._review(
+                event,
+                RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
+            )
+
         if not event.track_id.strip():
             return self._review(
                 event,
                 RedLightViolationReason.TRACK_ID_MISSING,
-            )
-
-        if (
-            not isfinite(event.timestamp_ms)
-            or event.timestamp_ms < 0
-            or not self._valid_confidence(event.confidence)
-        ):
-            return self._review(
-                event,
-                RedLightViolationReason.INVALID_CROSSING_EVIDENCE,
             )
 
         if event.confidence < self.min_crossing_confidence:
@@ -307,4 +342,25 @@ class RedLightViolationDecider:
             RedLightViolationReason.TRAFFIC_LIGHT_STATE_UNKNOWN,
             state,
             confidence,
+        )
+
+    @staticmethod
+    def _valid_timestamp(value: object) -> bool:
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and isfinite(value)
+            and value >= 0
+        )
+
+    @classmethod
+    def _valid_observation(
+        cls,
+        observation: TrafficLightObservation,
+    ) -> bool:
+        return (
+            isinstance(observation, TrafficLightObservation)
+            and cls._valid_timestamp(observation.timestamp_ms)
+            and isinstance(observation.state, TrafficLightState)
+            and cls._valid_confidence(observation.confidence)
         )
